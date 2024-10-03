@@ -1,6 +1,6 @@
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -1440,7 +1440,8 @@ void BrowserCommandController::InitComma
+@@ -1440,7 +1440,8 @@ void BrowserCommandController::InitCommandState() {
    command_updater_.UpdateCommandEnabled(IDC_WINDOW_CLOSE_OTHER_TABS,
                                          normal_window);
  
@@ -20,7 +20,7 @@
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/strings/utf_string_conversions.h"
-@@ -115,7 +116,8 @@ TabStripRegionView::TabStripRegionView(s
+@@ -115,7 +116,8 @@ TabStripRegionView::TabStripRegionView(std::unique_ptr<TabStrip> tab_strip)
  
    // Add and configure the TabSearchContainer.
    std::unique_ptr<TabSearchContainer> tab_search_container;
@@ -32,10 +32,10 @@
          render_tab_search_before_tab_strip_, this);
 --- a/chrome/browser/ungoogled_flag_entries.h
 +++ b/chrome/browser/ungoogled_flag_entries.h
-@@ -60,4 +60,8 @@
-      "Clear data on exit",
-      "Clears all browsing data on exit. ungoogled-chromium flag",
-      kOsDesktop, FEATURE_VALUE_TYPE(features::kClearDataOnExit)},
+@@ -88,4 +88,8 @@
+      "Allow clearing site data on exit",
+      "See #clear-data-on-exit flag. ungoogled-chromium flag",
+      kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearSiteDataOnExit)},
 +    {"remove-tabsearch-button",
 +     "Remove Tabsearch Button",
 +     "Removes the tabsearch button from the tabstrip. ungoogled-chromium flag",

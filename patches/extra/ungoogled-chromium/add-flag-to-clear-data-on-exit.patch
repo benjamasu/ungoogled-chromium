@@ -1,18 +1,32 @@
 --- a/chrome/browser/browser_features.cc
 +++ b/chrome/browser/browser_features.cc
-@@ -410,4 +410,5 @@ BASE_FEATURE(kReportPakFileIntegrity,
+@@ -410,4 +410,12 @@ BASE_FEATURE(kReportPakFileIntegrity,
  BASE_FEATURE(kRemovalOfIWAsFromTabCapture,
               "RemovalOfIWAsFromTabCapture",
               base::FEATURE_ENABLED_BY_DEFAULT);
 +BASE_FEATURE(kClearDataOnExit, "ClearDataOnExit", base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearCacheOnExit, "AllowClearCacheOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearDownloadsOnExit, "AllowClearDownloadsOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearSiteSettingsOnExit, "AllowClearSiteSettingsOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearFormDataOnExit, "AllowClearFormDataOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearPasswordsOnExit, "AllowClearPasswordsOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearHistoryOnExit, "AllowClearHistoryOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kAllowClearSiteDataOnExit, "AllowClearSiteDataOnExit", base::FEATURE_ENABLED_BY_DEFAULT);
  }  // namespace features
 --- a/chrome/browser/browser_features.h
 +++ b/chrome/browser/browser_features.h
-@@ -145,6 +145,7 @@ BASE_DECLARE_FEATURE(kBrowserDynamicCode
+@@ -145,6 +145,14 @@ BASE_DECLARE_FEATURE(kBrowserDynamicCodeDisabled);
  BASE_DECLARE_FEATURE(kReportPakFileIntegrity);
  
  BASE_DECLARE_FEATURE(kRemovalOfIWAsFromTabCapture);
 +BASE_DECLARE_FEATURE(kClearDataOnExit);
++BASE_DECLARE_FEATURE(kAllowClearCacheOnExit);
++BASE_DECLARE_FEATURE(kAllowClearDownloadsOnExit);
++BASE_DECLARE_FEATURE(kAllowClearSiteSettingsOnExit);
++BASE_DECLARE_FEATURE(kAllowClearFormDataOnExit);
++BASE_DECLARE_FEATURE(kAllowClearPasswordsOnExit);
++BASE_DECLARE_FEATURE(kAllowClearHistoryOnExit);
++BASE_DECLARE_FEATURE(kAllowClearSiteDataOnExit);
  }  // namespace features
  
  #endif  // CHROME_BROWSER_BROWSER_FEATURES_H_
@@ -26,7 +40,7 @@
  #include "chrome/browser/browser_process.h"
  #include "chrome/browser/browsing_data/chrome_browsing_data_remover_constants.h"
  #include "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.h"
-@@ -147,6 +148,21 @@ class BrowsingDataRemoverObserver
+@@ -147,6 +148,28 @@ class BrowsingDataRemoverObserver
  #endif
  };
  
@@ -35,20 +49,27 @@
 +         content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB;
 +}
 +
-+uint64_t AllRemoveMask() {
-+  return content::BrowsingDataRemover::DATA_TYPE_CACHE |
-+         content::BrowsingDataRemover::DATA_TYPE_DOWNLOADS |
-+         chrome_browsing_data_remover::DATA_TYPE_CONTENT_SETTINGS |
-+         chrome_browsing_data_remover::DATA_TYPE_FORM_DATA |
-+         chrome_browsing_data_remover::DATA_TYPE_HISTORY |
-+         chrome_browsing_data_remover::DATA_TYPE_PASSWORDS |
-+         chrome_browsing_data_remover::DATA_TYPE_SITE_DATA;
++uint64_t GetRemoveOnExitMask() {
++  return (base::FeatureList::IsEnabled(features::kAllowClearCacheOnExit) ?
++	   content::BrowsingDataRemover::DATA_TYPE_CACHE : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearDownloadsOnExit) ?
++	   content::BrowsingDataRemover::DATA_TYPE_DOWNLOADS : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearSiteSettingsOnExit) ?
++	   chrome_browsing_data_remover::DATA_TYPE_CONTENT_SETTINGS : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearFormDataOnExit) ?
++	   chrome_browsing_data_remover::DATA_TYPE_FORM_DATA : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearHistoryOnExit) ?
++	   chrome_browsing_data_remover::DATA_TYPE_HISTORY : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearPasswordsOnExit) ?
++	   chrome_browsing_data_remover::DATA_TYPE_PASSWORDS : 0) |
++         (base::FeatureList::IsEnabled(features::kAllowClearSiteDataOnExit) ?
++	   chrome_browsing_data_remover::DATA_TYPE_SITE_DATA : 0);
 +}
 +
  uint64_t GetOriginTypeMask(const base::Value::List& data_types) {
    uint64_t result = 0;
    for (const auto& data_type : data_types) {
-@@ -314,9 +330,10 @@ void ChromeBrowsingDataLifetimeManager::
+@@ -314,9 +337,10 @@ void ChromeBrowsingDataLifetimeManager::ClearBrowsingDataForOnExitPolicy(
    const base::Value::List& data_types = profile_->GetPrefs()->GetList(
        browsing_data::prefs::kClearBrowsingDataOnExitList);
  
@@ -61,20 +82,20 @@
      profile_->GetPrefs()->SetBoolean(
          browsing_data::prefs::kClearBrowsingDataOnExitDeletionPending, true);
      auto* remover = profile_->GetBrowsingDataRemover();
-@@ -327,8 +344,8 @@ void ChromeBrowsingDataLifetimeManager::
+@@ -327,8 +351,8 @@ void ChromeBrowsingDataLifetimeManager::ClearBrowsingDataForOnExitPolicy(
        DCHECK(keep_browser_alive);
  #endif
      remover->RemoveAndReply(base::Time(), base::Time::Max(),
 -                            GetRemoveMask(data_types),
 -                            GetOriginTypeMask(data_types),
-+                            cdoe ? AllRemoveMask() : GetRemoveMask(data_types),
++                            cdoe ? GetRemoveOnExitMask() : GetRemoveMask(data_types),
 +                            cdoe ? AllOriginTypeMask() : GetOriginTypeMask(data_types),
                              BrowsingDataRemoverObserver::Create(
                                  remover, /*filterable_deletion=*/true, profile_,
                                  keep_browser_alive));
 --- a/chrome/browser/ungoogled_flag_entries.h
 +++ b/chrome/browser/ungoogled_flag_entries.h
-@@ -56,4 +56,8 @@
+@@ -56,4 +56,36 @@
       "Keep old history",
       "Keep history older than 3 months. ungoogled-chromium flag",
       kOsAll, SINGLE_VALUE_TYPE("keep-old-history")},
@@ -82,4 +103,32 @@
 +     "Clear data on exit",
 +     "Clears all browsing data on exit. ungoogled-chromium flag",
 +     kOsDesktop, FEATURE_VALUE_TYPE(features::kClearDataOnExit)},
++    {"allow-clearing-cache-on-exit",
++     "Allow clearing cache on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearCacheOnExit)},
++    {"allow-clearing-downloads-on-exit",
++     "Allow clearing downloads list on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearDownloadsOnExit)},
++    {"allow-clearing-site-settings-on-exit",
++     "Allow clearing site settings on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearSiteSettingsOnExit)},
++    {"allow-clearing-form-data-on-exit",
++     "Allow clearing form data on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearFormDataOnExit)},
++    {"allow-clearing-passwords-on-exit",
++     "Allow clearing saved credentials on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearPasswordsOnExit)},
++    {"allow-clearing-history-on-exit",
++     "Allow clearing history on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearHistoryOnExit)},
++    {"allow-clearing-site-data-on-exit",
++     "Allow clearing site data on exit",
++     "See #clear-data-on-exit flag. ungoogled-chromium flag",
++     kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearSiteDataOnExit)},
  #endif  // CHROME_BROWSER_UNGOOGLED_FLAG_ENTRIES_H_
