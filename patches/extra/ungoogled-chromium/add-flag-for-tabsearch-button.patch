@@ -34,7 +34,7 @@
 +++ b/chrome/browser/ungoogled_flag_entries.h
 @@ -88,4 +88,8 @@
       "Allow clearing site data on exit",
-      "See #clear-data-on-exit flag. ungoogled-chromium flag",
+      "Allows clearing site data on exit. Has no effect without the #clear-data-on-exit flag enabled. ungoogled-chromium flag",
       kOsDesktop, FEATURE_VALUE_TYPE(features::kAllowClearSiteDataOnExit)},
 +    {"remove-tabsearch-button",
 +     "Remove Tabsearch Button",
